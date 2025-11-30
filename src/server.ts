@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { Pool } from "pg";
@@ -46,7 +46,14 @@ const initDB = async () => {
 
 initDB();
 
-app.get("/", (req: Request, res: Response) => {
+// logger middleware
+
+const logger = (req: Request, res: Response, next: NextFunction) =>{
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}\n`);
+  next();
+}
+
+app.get("/", logger,(req: Request, res: Response) => {
   res.send("Hello World! 1");
 });
 
@@ -211,6 +218,39 @@ app.post("/todos", async(req: Request, res: Response)=>{
       details: err
     })
   }
+})
+
+//get all todos
+
+app.get("/todos", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM todos
+      `);
+
+    res.status(200).json({
+      success: true,
+      message: "todos retrieved successfully",
+      data: result.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+      details: err,
+    });
+  }
+});
+
+
+//not found round
+
+app.use((req:Request, res: Response)=>{
+  res.status(404).json({
+    success:false,
+    message: 'route not found',
+    path: req.path
+  })
 })
 
 
