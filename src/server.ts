@@ -1,20 +1,20 @@
-import express, { Request, Response } from 'express';
-import dotenv from 'dotenv';
-import path from 'path'
-import {Pool} from 'pg';
-const app = express()
-const port = 5000
+import express, { Request, Response } from "express";
+import dotenv from "dotenv";
+import path from "path";
+import { Pool } from "pg";
+const app = express();
+const port = 5000;
 
-dotenv.config({path: path.join(process.cwd(), '.env')});
+dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 //creating connection pool for postgrad sql
 //! you must install pg by npm
 //todo: for free database hosting use neon console
 // Parser
-app.use(express.json())
+app.use(express.json());
 
 const pool = new Pool({
-  connectionString: `${process.env.CONNECTION_STR}`
+  connectionString: `${process.env.CONNECTION_STR}`,
 });
 
 const initDB = async () => {
@@ -41,27 +41,41 @@ const initDB = async () => {
     due_date DATE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
-    )`)
+    )`);
 };
 
 initDB();
 
+app.get("/", (req: Request, res: Response) => {
+  res.send("Hello World! 1");
+});
 
+app.post("/users", async (req: Request, res: Response) => {
+  const { name, email, age, phone, address } = req.body;
 
+  try {
+    const result = await pool.query(
+      `
+          INSERT INTO users(name, email, age, phone, address) VALUES($1, $2, $3, $4, $5) RETURNING *
+          `,
+      [name, email, age, phone, address]
+    );
 
+ 
 
-app.get('/', (req:Request, res: Response) => {
-  res.send('Hello World! 1')
-})
-
-app.post("/", (req:Request, res:Response)=>{
-    console.log(req.body);
-    res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: "API is working"
-    })
-})
+      message: "data inserted successfully....",
+      data: result.rows[0]
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Example app listening on port ${port}`);
+});
