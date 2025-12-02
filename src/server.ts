@@ -1,77 +1,39 @@
 import express, { NextFunction, Request, Response } from "express";
-import dotenv from "dotenv";
-import path from "path";
-import { Pool } from "pg";
+import config from "./config";
+import initDB, { pool } from "./config/db";
+
 const app = express();
-const port = 5000;
-
-dotenv.config({ path: path.join(process.cwd(), ".env") });
-
-//creating connection pool for postgrad sql
-//! you must install pg by npm
-//todo: for free database hosting use neon console
-// Parser
+const port = config.port;
+// parser
 app.use(express.json());
+// app.use(express.urlencoded());
 
-const pool = new Pool({
-  connectionString: `${process.env.CONNECTION_STR}`,
-});
-
-const initDB = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(100) NOT NULL,
-      email VARCHAR(150) UNIQUE NOT NULL,
-      age INT,
-      phone VARCHAR(15),
-      address TEXT,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS todos (
-    id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(200) NOT NULL,
-    description TEXT,
-    completed BOOLEAN DEFAULT false,
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-    )`);
-};
-
+// initializing DB
 initDB();
 
 // logger middleware
-
-const logger = (req: Request, res: Response, next: NextFunction) =>{
-  console.log(`${new Date().toISOString()} ${req.method} ${req.path}\n`);
+const logger = (req: Request, res: Response, next: NextFunction) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}\n`);
   next();
-}
+};
 
-app.get("/", logger,(req: Request, res: Response) => {
-  res.send("Hello World! 1");
+app.get("/", logger, (req: Request, res: Response) => {
+  res.send("Hello Next Level Developers!");
 });
 
-//api to create new user on database
+//users CRUD
 app.post("/users", async (req: Request, res: Response) => {
-  const { name, email, age, phone, address } = req.body;
+  const { name, email } = req.body;
 
   try {
     const result = await pool.query(
-      `
-          INSERT INTO users(name, email, age, phone, address) VALUES($1, $2, $3, $4, $5) RETURNING *
-          `,
-      [name, email, age, phone, address]
+      `INSERT INTO users(name, email) VALUES($1, $2) RETURNING *`,
+      [name, email]
     );
-
+    // console.log(result.rows[0]);
     res.status(201).json({
-      success: true,
-      message: "data inserted successfully....",
+      success: false,
+      message: "Data Instered Successfully",
       data: result.rows[0],
     });
   } catch (err: any) {
@@ -82,81 +44,97 @@ app.post("/users", async (req: Request, res: Response) => {
   }
 });
 
-//api to get all users
-
+// users Crud
 app.get("/users", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM users
-      `);
+    const result = await pool.query(`SELECT * FROM users`);
 
     res.status(200).json({
       success: true,
-      message: "USERS retrieved successfully",
+      message: "Users retrieved successfully",
       data: result.rows,
     });
   } catch (err: any) {
     res.status(500).json({
       success: false,
       message: err.message,
-      details: err,
+      datails: err,
     });
   }
 });
 
-//get a specific user
-
 app.get("/users/:id", async (req: Request, res: Response) => {
+  // console.log(req.params.id);
   try {
-    const result = await pool.query(
-      `
-      SELECT * FROM users WHERE id = $1
-      `,
-      [req.params.id]
-    );
+    const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [
+      req.params.id,
+    ]);
 
     if (result.rows.length === 0) {
       res.status(404).json({
         success: false,
-        message: "user not found",
+        message: "User not found",
       });
     } else {
       res.status(200).json({
         success: true,
-        message: "user retrieve successfully",
-        data: result.rows,
+        message: "User fetched successfully",
+        data: result.rows[0],
       });
     }
   } catch (err: any) {
     res.status(500).json({
       success: false,
       message: err.message,
-      details: err,
     });
   }
 });
 
-//update a user
-
 app.put("/users/:id", async (req: Request, res: Response) => {
+  // console.log(req.params.id);
   const { name, email } = req.body;
   try {
     const result = await pool.query(
-      `
-      UPDATE users SET name=$1, email=$2 WHERE id=$3 RETURNING 8
-      `,
+      `UPDATE users SET name=$1, email=$2 WHERE id=$3 RETURNING *`,
       [name, email, req.params.id]
     );
 
     if (result.rows.length === 0) {
       res.status(404).json({
         success: false,
-        message: "user not found",
+        message: "User not found",
       });
     } else {
       res.status(200).json({
         success: true,
-        message: "user updated successfully",
+        message: "User updated successfully",
+        data: result.rows[0],
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.delete("/users/:id", async (req: Request, res: Response) => {
+  // console.log(req.params.id);
+  try {
+    const result = await pool.query(`DELETE FROM users WHERE id = $1`, [
+      req.params.id,
+    ]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "User deleted successfully",
         data: result.rows,
       });
     }
@@ -164,69 +142,35 @@ app.put("/users/:id", async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: err.message,
-      details: err,
     });
   }
 });
 
-//delete a user
+// todos crud
+app.post("/todos", async (req: Request, res: Response) => {
+  const { user_id, title } = req.body;
 
-app.delete("/users/:id", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`DELETE FROM users WHERE id=$1`, [
-      req.params.id,
-    ]);
-     
-     console.log(result)
-     if (result.rowCount === 0) {
-      res.status(404).json({
-        success: false,
-        message: "user not found",
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "user deleted successfully",
-        data: null,
-      });
-    }
+    const result = await pool.query(
+      `INSERT INTO todos(user_id, title) VALUES($1, $2) RETURNING *`,
+      [user_id, title]
+    );
+    res.status(201).json({
+      success: true,
+      message: "Todo created",
+      data: result.rows[0],
+    });
   } catch (err: any) {
     res.status(500).json({
       success: false,
       message: err.message,
-      details: err,
     });
   }
 });
 
-//todo crud
-
-//create a todo
-app.post("/todos", async(req: Request, res: Response)=>{
-  const {user_id, title} = req.body;
-  try{
-     const result = await pool.query(`INSERT INTO todos(user_id, title) VALUES($1, $2) RETURNING*`, [user_id, title]);
-     res.status(201).json({
-      success:true,
-      message: 'todo added successfully..',
-      data: result.rows[0]
-     })
-  }catch(err: any){
-    res.status(500).json({
-      success:false,
-      message: err.message,
-      details: err
-    })
-  }
-})
-
-//get all todos
-
 app.get("/todos", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM todos
-      `);
+    const result = await pool.query(`SELECT * FROM todos`);
 
     res.status(200).json({
       success: true,
@@ -237,22 +181,76 @@ app.get("/todos", async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: err.message,
-      details: err,
+      datails: err,
     });
   }
 });
 
+// Get single todo
+app.get("/todos/:id", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM todos WHERE id = $1", [
+      req.params.id,
+    ]);
 
-//not found round
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Todo not found" });
+    }
 
-app.use((req:Request, res: Response)=>{
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Failed to fetch todo" });
+  }
+});
+
+// Update todo
+app.put("/todos/:id", async (req, res) => {
+  const { title, completed } = req.body;
+
+  try {
+    const result = await pool.query(
+      "UPDATE todos SET title=$1, completed=$2 WHERE id=$3 RETURNING *",
+      [title, completed, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Todo not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Failed to update todo" });
+  }
+});
+
+// Delete todo
+app.delete("/todos/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM todos WHERE id=$1 RETURNING *",
+      [req.params.id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Todo not found" });
+    }
+
+    res.json({ success: true, message: "Todo deleted", data: null });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Failed to delete todo" });
+  }
+});
+
+app.use((req, res) => {
   res.status(404).json({
-    success:false,
-    message: 'route not found',
-    path: req.path
-  })
-})
-
+    success: false,
+    message: "Route not found",
+    path: req.path,
+  });
+});
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
