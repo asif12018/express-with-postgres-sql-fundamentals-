@@ -1,147 +1,119 @@
+
 import express, { NextFunction, Request, Response } from "express";
+import { Pool } from "pg";
 import config from "./config";
 import initDB, { pool } from "./config/db";
-
-const app = express();
+import logger from "./middlewares/logger";
+import { userRoutes } from "./modules/user/user.routes";
+export const app = express();
 const port = config.port;
-// parser
-app.use(express.json());
-// app.use(express.urlencoded());
 
-// initializing DB
+
+//creating connection pool for postgrad sql
+//! you must install pg by npm
+//todo: for free database hosting use neon console
+// Parser
+app.use(express.json());
+
+
+
+
+//initializing database
 initDB();
 
 // logger middleware
-const logger = (req: Request, res: Response, next: NextFunction) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}\n`);
-  next();
-};
 
-app.get("/", logger, (req: Request, res: Response) => {
-  res.send("Hello Next Level Developers!");
+
+app.get("/", logger,(req: Request, res: Response) => {
+  res.send("Hello World! 1");
 });
 
-//users CRUD
-app.post("/users", async (req: Request, res: Response) => {
-  const { name, email } = req.body;
+//api to create new user on database
+// app.post("/users", async (req: Request, res: Response) => {
+//   const { name, email, age, phone, address } = req.body;
 
-  try {
-    const result = await pool.query(
-      `INSERT INTO users(name, email) VALUES($1, $2) RETURNING *`,
-      [name, email]
-    );
-    // console.log(result.rows[0]);
-    res.status(201).json({
-      success: false,
-      message: "Data Instered Successfully",
-      data: result.rows[0],
-    });
-  } catch (err: any) {
+//   try {
+//     const result = await pool.query(
+//       `
+//           INSERT INTO users(name, email, age, phone, address) VALUES($1, $2, $3, $4, $5) RETURNING *
+//           `,
+//       [name, email, age, phone, address]
+//     );
+
+//     res.status(201).json({
+//       success: true,
+//       message: "data inserted successfully....",
+//       data: result.rows[0],
+//     });
+//   } catch (err: any) {
+//     res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// });
+
+app.use("/users",userRoutes);
+
+//api to get all users
+
+app.use("/users", userRoutes);
+
+//get a specific user
+
+
+app.use("/users", userRoutes)
+
+//update a user
+
+
+app.use("/users", userRoutes)
+
+//delete a user
+
+
+
+app.use("/users", userRoutes)
+
+//todo crud
+
+//create a todo
+app.post("/todos", async(req: Request, res: Response)=>{
+  const {user_id, title} = req.body;
+  try{
+     const result = await pool.query(`INSERT INTO todos(user_id, title) VALUES($1, $2) RETURNING*`, [user_id, title]);
+     res.status(201).json({
+      success:true,
+      message: 'todo added successfully..',
+      data: result.rows[0]
+     })
+  }catch(err: any){
     res.status(500).json({
-      success: false,
+      success:false,
       message: err.message,
-    });
+      details: err
+    })
   }
-});
+})
 
-// users Crud
-app.get("/users", async (req: Request, res: Response) => {
+//get all todos
+
+app.get("/todos", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`SELECT * FROM users`);
+    const result = await pool.query(`
+      SELECT * FROM todos
+      `);
 
     res.status(200).json({
       success: true,
-      message: "Users retrieved successfully",
+      message: "todos retrieved successfully",
       data: result.rows,
     });
   } catch (err: any) {
     res.status(500).json({
       success: false,
       message: err.message,
-      datails: err,
-    });
-  }
-});
-
-app.get("/users/:id", async (req: Request, res: Response) => {
-  // console.log(req.params.id);
-  try {
-    const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [
-      req.params.id,
-    ]);
-
-    if (result.rows.length === 0) {
-      res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "User fetched successfully",
-        data: result.rows[0],
-      });
-    }
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-});
-
-app.put("/users/:id", async (req: Request, res: Response) => {
-  // console.log(req.params.id);
-  const { name, email } = req.body;
-  try {
-    const result = await pool.query(
-      `UPDATE users SET name=$1, email=$2 WHERE id=$3 RETURNING *`,
-      [name, email, req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "User updated successfully",
-        data: result.rows[0],
-      });
-    }
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-});
-
-app.delete("/users/:id", async (req: Request, res: Response) => {
-  // console.log(req.params.id);
-  try {
-    const result = await pool.query(`DELETE FROM users WHERE id = $1`, [
-      req.params.id,
-    ]);
-
-    if (result.rowCount === 0) {
-      res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "User deleted successfully",
-        data: result.rows,
-      });
-    }
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
+      details: err,
     });
   }
 });
@@ -244,13 +216,17 @@ app.delete("/todos/:id", async (req, res) => {
   }
 });
 
-app.use((req, res) => {
+
+//not found round
+
+app.use((req:Request, res: Response)=>{
   res.status(404).json({
-    success: false,
-    message: "Route not found",
-    path: req.path,
-  });
-});
+    success:false,
+    message: 'route not found',
+    path: req.path
+  })
+})
+
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
