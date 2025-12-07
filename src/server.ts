@@ -6,6 +6,7 @@ import initDB, { pool } from "./config/db";
 import logger from "./middlewares/logger";
 import { userRoutes } from "./modules/user/user.routes";
 import router from "./modules/todo/todo.routes";
+import { authRoutes } from "./modules/auth/auth.route";
 export const app = express();
 const port = config.port;
 
@@ -30,29 +31,6 @@ app.get("/", logger,(req: Request, res: Response) => {
 });
 
 //api to create new user on database
-// app.post("/users", async (req: Request, res: Response) => {
-//   const { name, email, age, phone, address } = req.body;
-
-//   try {
-//     const result = await pool.query(
-//       `
-//           INSERT INTO users(name, email, age, phone, address) VALUES($1, $2, $3, $4, $5) RETURNING *
-//           `,
-//       [name, email, age, phone, address]
-//     );
-
-//     res.status(201).json({
-//       success: true,
-//       message: "data inserted successfully....",
-//       data: result.rows[0],
-//     });
-//   } catch (err: any) {
-//     res.status(500).json({
-//       success: false,
-//       message: err.message,
-//     });
-//   }
-// });
 
 app.use("/users",userRoutes);
 
@@ -98,6 +76,11 @@ app.use("/todos", router);
 //delete a todos
 
 app.use("/todos", router);
+
+
+//auth routes
+
+app.use("/auth", authRoutes);
 
 
 //not found round
